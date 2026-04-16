@@ -1,0 +1,30 @@
+{
+  "defaultRetryCount": 3,
+  "checkpointDir": "/home/morpheus/.task-checkpoints",
+  "learningEnabled": true,
+  "learningDir": "/home/morpheus/.openclaw/workspace/.learnings",
+  "maxParallelTasks": 3,
+  "toolPreferences": {
+    "textProcessing": ["summarize-pro", "text-generation"],
+    "webInteraction": ["agent-browser", "web_search"],
+    "fileOps": ["self-improving-agent"],
+    "webSearch": ["web_search", "agent-browser"],
+    "execution": ["exec", "agent-browser"],
+    "calendar": ["gog"],
+    "email": ["gog"],
+    "github": ["github"]
+  },
+  "failureThresholds": {
+    "maxFailuresBeforeAbort": 3,
+    "maxDuration": "2h"
+  },
+  "notifications": {
+    "email": "zendraillustratus@gmail.com",
+    "onFailure": true,
+    "onCompletion": true
+  },
+  "debug": {
+    "verbose": false,
+    "logLevel": "info"
+  }
+}

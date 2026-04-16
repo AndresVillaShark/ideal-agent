@@ -1,0 +1,370 @@
+#!/usr/bin/env node
+
+/**
+ * Task Orchestrator CLI
+ * Advanced task decomposition, workflow orchestration, and intelligent execution
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
+
+// Configuration
+const CONFIG = {
+  checkpointDir: process.env.CHECKPOINT_DIR || path.join(process.env.HOME, '.task-checkpoints'),
+  learningDir: process.env.LEARNING_DIR || path.join(process.env.HOME, '.openclaw', 'workspace', '.learnings'),
+  maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
+  maxParallelTasks: parseInt(process.env.MAX_PARALLEL) || 3,
+};
+
+// Ensure directories exist
+if (!fs.existsSync(CONFIG.checkpointDir)) {
+  fs.mkdirSync(CONFIG.checkpointDir, { recursive: true });
+}
+
+if (!fs.existsSync(CONFIG.learningDir)) {
+  fs.mkdirSync(CONFIG.learningDir, { recursive: true });
+}
+
+/**
+ * Analyze a task and decompose it into subtasks
+ */
+async function analyzeTask(taskDescription) {
+  console.log(`🔍 Analyzing task:\n${taskDescription}\n`);
+  
+  // In a real implementation, this would use AI to decompose the task
+  // For now, we provide a rule-based analysis framework
+  const analysis = {
+    taskId: `task-${Date.now()}`,
+    description: taskDescription,
+    timestamp: new Date().toISOString(),
+    complexity: 'auto', // Would be determined by AI analysis
+    estimatedSteps: 0,
+    subtasks: [],
+    dependencies: {},
+    parallelGroups: [],
+    recommendedTools: [],
+  };
+
+  // Placeholder for AI-based decomposition
+  // In production, this would call an LLM to analyze and break down the task
+  
+  return analysis;
+}
+
+/**
+ * Execute a single subtask with retry logic
+ */
+async function executeSubtask(subtask, taskId) {
+  console.log(`⚙️  Executing subtask: ${subtask.name}`);
+  
+  for (let attempt = 1; attempt <= CONFIG.maxRetries; attempt++) {
+    console.log(`  Attempt ${attempt}/${CONFIG.maxRetries}`);
+    
+    try {
+      // Execute the subtask (would call appropriate tool/CLI based on subtask.tool)
+      const result = await runSubtask(subtask);
+      
+      // Save checkpoint
+      await saveCheckpoint(taskId, subtask.id, {
+        status: 'completed',
+        attempt: attempt,
+        result: result,
+        timestamp: new Date().toISOString(),
+      });
+      
+      return { success: true, result, attempt };
+    } catch (error) {
+      console.error(`  ❌ Attempt ${attempt} failed: ${error.message}`);
+      
+      if (attempt === CONFIG.maxRetries) {
+        await saveCheckpoint(taskId, subtask.id, {
+          status: 'failed',
+          attempts: attempt,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
+        
+        return { success: false, error: error.message, attempts: attempt };
+      }
+      
+      // Wait before retry (exponential backoff)
+      const waitTime = Math.pow(2, attempt) * 1000;
+      console.log(`  ⏳ Waiting ${waitTime}ms before retry...`);
+      await sleep(waitTime);
+    }
+  }
+}
+
+/**
+ * Run a subtask using the appropriate tool
+ */
+async function runSubtask(subtask) {
+  // This would dispatch to the appropriate tool based on subtask.tool
+  // For example:
+  // - 'web_search' -> web_search API
+  // - 'file_read' -> read tool
+  // - 'exec' -> spawn child process
+  // - 'agent-browser' -> agent-browser CLI
+  
+  console.log(`  🛠️  Using tool: ${subtask.tool}`);
+  
+  // Placeholder - in production, this dispatches to the real tool
+  return {
+    tool: subtask.tool,
+    input: subtask.input,
+    output: 'Would execute: ' + subtask.description,
+  };
+}
+
+/**
+ * Save execution checkpoint for recovery
+ */
+async function saveCheckpoint(taskId, stepId, data) {
+  const checkpointPath = path.join(CONFIG.checkpointDir, taskId);
+  
+  if (!fs.existsSync(checkpointPath)) {
+    fs.mkdirSync(checkpointPath, { recursive: true });
+  }
+  
+  const checkpointFile = path.join(checkpointPath, `checkpoint-${stepId}.json`);
+  fs.writeFileSync(checkpointFile, JSON.stringify(data, null, 2));
+  
+  console.log(`  📝 Checkpoint saved: ${checkpointFile}`);
+}
+
+/**
+ * Execute orchestrat ed workflow
+ */
+async function runOrchestration(taskDescription, options = {}) {
+  console.log('🚀 Starting Task Orchestrator\n');
+  
+  // Analyze and decompose
+  const analysis = await analyzeTask(taskDescription);
+  console.log('📋 Task Analysis Complete\n');
+  console.log(JSON.stringify(analysis, null, 2));
+  
+  if (options.dryRun) {
+    console.log('\n✅ Dry run completed. No execution.\n');
+    return analysis;
+  }
+  
+  // Initialize workflow state
+  const workflowState = {
+    taskId: analysis.taskId,
+    startTime: Date.now(),
+    completedSubtasks: 0,
+    failedSubtasks: 0,
+    results: {},
+  };
+  
+  // Execute subtasks respecting dependencies and parallel groups
+  // This would be a full graph execution engine
+  console.log('\n⚡ Ready to execute workflow (stub - execution engine needs implementation)\n');
+  
+  return {
+    ...analysis,
+    workflowState,
+    status: 'initialized',
+  };
+}
+
+/**
+ * Resume from checkpoint
+ */
+async function resumeTask(taskId) {
+  const checkpointDir = path.join(CONFIG.checkpointDir, taskId);
+  
+  if (!fs.existsSync(checkpointDir)) {
+    throw new Error(`No checkpoints found for task: ${taskId}`);
+  }
+  
+  console.log(`🔄 Resuming task: ${taskId}\n`);
+  
+  // Load checkpoints
+  const checkpoints = fs.readdirSync(checkpointDir)
+    .filter(f => f.startsWith('checkpoint-'))
+    .map(f => JSON.parse(fs.readFileSync(path.join(checkpointDir, f), 'utf8')));
+  
+  console.log(`📊 Found ${checkpoints.length} checkpoints\n`);
+  console.log(JSON.stringify(checkpoints, null, 2));
+  
+  return { taskId, checkpoints };
+}
+
+/**
+ * Display status of running task
+ */
+async function taskStatus(taskId) {
+  const checkpointDir = path.join(CONFIG.checkpointDir, taskId);
+  
+  if (!fs.existsSync(checkpointDir)) {
+    console.log(`ℹ️  No checkpoints found for task: ${taskId}`);
+    return null;
+  }
+  
+  const checkpoints = fs.readdirSync(checkpointDir)
+    .filter(f => f.startsWith('checkpoint-'))
+    .map(f => {
+      const data = JSON.parse(fs.readFileSync(path.join(checkpointDir, f), 'utf8'));
+      return {
+        file: f,
+        step: data.stepId,
+        status: data.status,
+        timestamp: data.timestamp,
+      };
+    });
+  
+  console.log(`📊 Status for task: ${taskId}\n`);
+  console.log(`💾 Checkpoints: ${checkpoints.length}\n`);
+  checkpoints.forEach(cp => {
+    console.log(`  ${cp.file}: ${cp.status} (${cp.timestamp})`);
+  });
+  
+  return checkpoints;
+}
+
+/**
+ * List recent learnings
+ */
+async function listLearnings(count = 5) {
+  const learningDir = CONFIG.learningDir;
+  
+  if (!fs.existsSync(learningDir)) {
+    console.log('No learnings found.\n');
+    return [];
+  }
+  
+  const filings = fs.readdirSync(learningDir)
+    .filter(f => f.endsWith('.json'))
+    .sort()
+    .reverse()
+    .slice(0, count);
+  
+  console.log(`📚 Recent Learnings (${filelings.length}):\n`);
+  filings.forEach(file => {
+    const data = JSON.parse(fs.readFileSync(path.join(learningDir, file), 'utf8'));
+    console.log(`  ${file}:`);
+    console.log(`    ${data.task || 'No description'}`);
+    console.log(`    Duration: ${data.duration || 'N/A'}`);
+    console.log(`    Success Rate: ${data.success_rate ? `${(data.success_rate * 100).toFixed(0)}%` : 'N/A'}`);
+    console.log('');
+  });
+  
+  return filings;
+}
+
+/**
+ * Utility: sleep
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// CLI interface
+async function main() {
+  const args = process.argv.slice(2);
+  const command = args[0];
+  
+  if (!command) {
+    console.log('Task Orchestrator CLI v1.0.0');
+    console.log('');
+    console.log('Usage:');
+    console.log('  task-orch start "<task description>" [options]');
+    console.log('  task-orch resume <task-id>');
+    console.log('  task-orch status <task-id>');
+    console.log('  task-orch learnings [--recent=N]');
+    console.log('  task-orch analyze "<task description>" --dry-run');
+    console.log('  task-orch init');
+    console.log('  task-orch --help');
+    process.exit(0);
+  }
+  
+  try {
+    switch (command) {
+      case 'start': {
+        const description = args[1];
+        if (!description) {
+          console.error('❌ Error: Task description required');
+          process.exit(1);
+        }
+        
+        const options = parseOptions(args.slice(2));
+        await runOrchestration(description, options);
+        break;
+      }
+      
+      case 'resume': {
+        const taskId = args[1];
+        if (!taskId) {
+          console.error('❌ Error: Task ID required');
+          process.exit(1);
+        }
+        await resumeTask(taskId);
+        break;
+      }
+      
+      case 'status': {
+        const taskId = args[1];
+        if (!taskId) {
+          console.error('❌ Error: Task ID required');
+          process.exit(1);
+        }
+        await taskStatus(taskId);
+        break;
+      }
+      
+      case 'learnings': {
+        const count = parseInt(args[1]?.replace('--recent=', '')) || 5;
+        await listLearnings(count);
+        break;
+      }
+      
+      case 'analyze': {
+        const description = args[1];
+        if (!description) {
+          console.error('❌ Error: Task description required');
+          process.exit(1);
+        }
+        
+        const options = parseOptions(args.slice(2));
+        await runOrchestration(description, { ...options, dryRun: true });
+        break;
+      }
+      
+      case 'init': {
+        // Initialize directories and config
+        const configPath = path.join(CONFIG.checkpointDir, 'config.json');
+        if (!fs.existsSync(configPath)) {
+          fs.writeFileSync(configPath, JSON.stringify(CONFIG, null, 2));
+        }
+        
+        console.log('✅ Task Orchestrator initialized');
+        console.log(`   Checkpoint dir: ${CONFIG.checkpointDir}`);
+        console.log(`   Learning dir: ${CONFIG.learningDir}`);
+        break;
+      }
+      
+      default:
+        console.error(`❌ Unknown command: ${command}`);
+        process.exit(1);
+    }
+  } catch (error) {
+    console.error(`❌ Error: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+function parseOptions(args) {
+  const options = {};
+  args.forEach(arg => {
+    if (arg.startsWith('--')) {
+      const [key, value] = arg.slice(2).split('=');
+      options[key] = value || true;
+    }
+  });
+  return options;
+}
+
+// Run CLI
+main();

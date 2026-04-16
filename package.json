@@ -1,0 +1,41 @@
+{
+  "name": "ideal-agent-task-orchestrator",
+  "version": "1.0.0",
+  "description": "Advanced task decomposition, workflow orchestration, and intelligent execution with failure recovery and learning",
+  "author": "Mario Villalpando",
+  "license": "MIT-0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndresVillaShark/ideal-agent"
+  },
+  "keywords": [
+    "openclaw",
+    "skill",
+    "task-orchestration",
+    "workflow",
+    "agent",
+    "automation",
+    "decomposition",
+    "learning"
+  ],
+  "bin": {
+    "task-orch": "./skills/task-orchestrator/task-orch"
+  },
+  "main": "skills/task-orchestrator/task-orch",
+  "directories": {
+    "skill": "skills/task-orchestrator",
+    "example": "example"
+  },
+  "files": [
+    "skills/task-orchestrator/**/*"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "init": "node skills/task-orchestrator/task-orch init",
+    "analyze": "node skills/task-orchestrator/task-orch analyze",
+    "test": "echo \"Run with: node skills/task-orchestrator/task-orch start '<task>'\"",
+    "link": "npm link"
+  }
+}

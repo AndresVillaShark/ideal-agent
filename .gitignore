@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+package-lock.json
+npm-debug.log
+
+# Runtime state
+.task-checkpoints/
+*.log
+
+# Config (secrets)
+~/.config/task-orchestrator/
+config.json
+.env
+.env.local
+
+# Learnings (may contain sensitive data)
+*.learnings/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Checkpoints and recovery state
+*_checkpoints/
+recovery_state/
