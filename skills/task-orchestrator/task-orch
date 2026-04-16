@@ -50,52 +50,59 @@ async function analyzeTask(taskDescription) {
  */
 async function llmDecomposeTask(taskId, taskDescription) {
   // Build prompt for LLM
-  const prompt = `You are an expert work decomposition engine. Analyze the following task and break it into executable subtasks.
+  const prompt = `You are an expert task decomposition engine. Analyze the following task and break it into executable subtasks.
 
 TASK: "${taskDescription}"
 
-Return a JSON object with this exact structure:
+Return ONLY a JSON object with NO markdown, NO explanation, and NO extra text. Must be valid JSON.
+
+Structure:
 {
   "taskId": "<id>",
   "description": "<task description>",
   "timestamp": "<ISO timestamp>",
   "complexity": "low|medium|high",
-  "estimatedSteps": <integer>,
-  "subtasks": [
-    {
-      "id": "step-1",
-      "name": "<short name>",
-      "description": "<what to do>",
-      "tool": "<recommended tool>",
-      "input": "<input data if any>",
-      "estimatedDuration": "<duration estimate>"
-    }
-  ],
-  "dependencies": {
-    "step-2": ["step-1"]
-  },
-  "parallelGroups": [
-    ["step-1", "step-2"]
-  ],
+  "estimatedSteps": <number>,
+  "subtasks": [{
+    "id": "<step-n>",
+    "name": "<short name>",
+    "description": "<what to do>",
+    "tool": "<recommended tool>",
+    "input": "<input data>",
+    "estimatedDuration": "<duration>"
+  }],
+  "dependencies": {"<step-id>": ["<prerequisite-step>"]},
+  "parallelGroups": [["<step-id-1>", "<step-id-2>"]],
   "recommendedTools": ["tool1", "tool2"]
 }
 
-Analyze carefully and provide a complete, executable breakdown. Use available tools like: agent-browser, web_search, gog (Google Workspace), github, file operations, text_generation, summarize, clawhub, exec, etc.`;
+Available tools: web_search, agent-browser, gog, github, file_edit, file_read, file_write, summarize-pro, text_generation, exec, clawhub, knowledge
+
+Return ONLY valid JSON, nothing else.`;
 
   try {
     // Call LLM service (using available text generation)
     const llmResponse = await callLLM(prompt);
     
-    // Parse the JSON response
-    const jsonMatch = llmResponse.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      parsed.taskId = taskId; // Override with our ID
-      return parsed;
+    // Parse the JSON response - handle both plain JSON and markdown code blocks
+    let jsonString = llmResponse;
+    
+    // Extract JSON from markdown code blocks if present
+    const codeBlockMatch = jsonString.match(/```(?:json)?([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      jsonString = codeBlockMatch[1].trim();
+      console.log('   Extracted JSON from markdown code block\n');
     }
     
-    // Fallback to rule-based if parsing fails
-    return await ruleBasedDecompose(taskId, taskDescription);
+    try {
+      const parsed = JSON.parse(jsonString); 
+      parsed.taskId = taskId; // Override with our ID
+      return parsed;
+    } catch (e) {
+      console.error(`   Failed to parse JSON: ${e.message}`);
+      console.log('   Raw LLM response:', jsonString.substring(0, 200));
+      throw e;
+    }
   } catch (error) {
     console.error(`⚠️  LLM decomposition failed: ${error.message}`);
     console.log('   Falling back to rule-based decomposition\n');
@@ -104,18 +111,49 @@ Analyze carefully and provide a complete, executable breakdown. Use available to
 }
 
 /**
- * Call LLM service (placeholder - integrates with available text generation)
+ * Call LLM service using Ollama
  */
 async function callLLM(prompt) {
-  // In production, this would call an actual LLM API
-  // For now, we try available tools:
+  const config = {
+    model: process.env.OLLAMA_MODEL || 'llama3.2',
+    endpoint: process.env.OLLAMA_ENDPOINT || 'http://localhost:11434',
+    timeout: parseInt(process.env.OLLAMA_TIMEOUT) || 60000
+  };
+
+  console.log(`🤖 Calling LLM: ${config.model}@${config.endpoint}`);
   
-  // Option 1: Use agent-browser with LLM service
-  // Option 2: Use summarize-pro with structured output
-  // Option 3: Fall back to rule-based patterns
-  
-  // This is a temporary implementation - replace with real LLM call
-  throw new Error('LLM service not configured');
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+
+    const response = await fetch(`${config.endpoint}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: config.model,
+        prompt: prompt,
+        stream: false,
+        options: {
+          temperature: 0.7,
+          num_predict: 2048
+        }
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`LLM API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log(`   Generated ${data.eval_count} tokens in ${data.eval_duration/1000000000}s\n`);
+    return data.response;
+  } catch (error) {
+    console.error(`   LLM call failed: ${error.message}`);
+    throw error;
+  }
 }
 
 /**
