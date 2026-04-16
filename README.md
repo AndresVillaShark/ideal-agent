@@ -510,3 +510,15 @@ to use, copy, modify, merge, publish, distribute, and/or sell copies of the Soft
 ---
 
 **Transform complex tasks into structured workflows. Learn from every execution. Execute better every time.**
+
+## LLM Integration
+
+The task orchestrator integrates with LLMs for **intelligent task decomposition**. To enable:
+
+1. Edit config at `~/.config/task-orchestrator/config.json`
+2. Specify LLM provider and endpoint
+3. Restart session to apply changes
+
+Currently uses **rule-based decomposition** as a reliable fallback. See [LLM-INTEGRATION.md](./LLM-INTEGRATION.md) for setup details.
+
+---

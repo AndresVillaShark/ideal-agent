@@ -373,9 +373,10 @@ wc -l ~/.ideal-agent/learnings/*.json
 
 ## Status
 
-**Version:** 1.0.0  
+**Version:** 1.1.0  
 **Author:** Mario Villalpando (ideal-agent project)  
 **License:** MIT-0 (Free use, modification, distribution)  
 **Created:** 2026-04-16  
 **Platform:** Linux, Darwin (macOS)  
-**Dependencies:** Node.js, jq, task-orch CLI
+**Dependencies:** Node.js, jq, task-orch CLI  
+**Decomposition:** Rule-based (production) + LLM (configurable)  
