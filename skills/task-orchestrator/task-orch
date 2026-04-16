@@ -27,29 +27,285 @@ if (!fs.existsSync(CONFIG.learningDir)) {
 }
 
 /**
- * Analyze a task and decompose it into subtasks
+ * Analyze a task and decompose it into subtasks using LLM
  */
 async function analyzeTask(taskDescription) {
   console.log(`🔍 Analyzing task:\n${taskDescription}\n`);
   
-  // In a real implementation, this would use AI to decompose the task
-  // For now, we provide a rule-based analysis framework
-  const analysis = {
-    taskId: `task-${Date.now()}`,
-    description: taskDescription,
-    timestamp: new Date().toISOString(),
-    complexity: 'auto', // Would be determined by AI analysis
-    estimatedSteps: 0,
-    subtasks: [],
-    dependencies: {},
-    parallelGroups: [],
-    recommendedTools: [],
-  };
-
-  // Placeholder for AI-based decomposition
-  // In production, this would call an LLM to analyze and break down the task
+  const taskId = `task-${Date.now()}`;
+  
+  // Call LLM to decompose the task
+  const analysis = await llmDecomposeTask(taskId, taskDescription);
+  
+  console.log('✅ Task decomposition complete\n');
+  console.log(`   Complexity: ${analysis.complexity}`);
+  console.log(`   Estimated subtasks: ${analysis.subtasks.length}`);
+  console.log(`   Parallel groups: ${analysis.parallelGroups.length}\n`);
   
   return analysis;
+}
+
+/**
+ * Decompose task using LLM API call
+ */
+async function llmDecomposeTask(taskId, taskDescription) {
+  // Build prompt for LLM
+  const prompt = `You are an expert work decomposition engine. Analyze the following task and break it into executable subtasks.
+
+TASK: "${taskDescription}"
+
+Return a JSON object with this exact structure:
+{
+  "taskId": "<id>",
+  "description": "<task description>",
+  "timestamp": "<ISO timestamp>",
+  "complexity": "low|medium|high",
+  "estimatedSteps": <integer>,
+  "subtasks": [
+    {
+      "id": "step-1",
+      "name": "<short name>",
+      "description": "<what to do>",
+      "tool": "<recommended tool>",
+      "input": "<input data if any>",
+      "estimatedDuration": "<duration estimate>"
+    }
+  ],
+  "dependencies": {
+    "step-2": ["step-1"]
+  },
+  "parallelGroups": [
+    ["step-1", "step-2"]
+  ],
+  "recommendedTools": ["tool1", "tool2"]
+}
+
+Analyze carefully and provide a complete, executable breakdown. Use available tools like: agent-browser, web_search, gog (Google Workspace), github, file operations, text_generation, summarize, clawhub, exec, etc.`;
+
+  try {
+    // Call LLM service (using available text generation)
+    const llmResponse = await callLLM(prompt);
+    
+    // Parse the JSON response
+    const jsonMatch = llmResponse.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      parsed.taskId = taskId; // Override with our ID
+      return parsed;
+    }
+    
+    // Fallback to rule-based if parsing fails
+    return await ruleBasedDecompose(taskId, taskDescription);
+  } catch (error) {
+    console.error(`⚠️  LLM decomposition failed: ${error.message}`);
+    console.log('   Falling back to rule-based decomposition\n');
+    return await ruleBasedDecompose(taskId, taskDescription);
+  }
+}
+
+/**
+ * Call LLM service (placeholder - integrates with available text generation)
+ */
+async function callLLM(prompt) {
+  // In production, this would call an actual LLM API
+  // For now, we try available tools:
+  
+  // Option 1: Use agent-browser with LLM service
+  // Option 2: Use summarize-pro with structured output
+  // Option 3: Fall back to rule-based patterns
+  
+  // This is a temporary implementation - replace with real LLM call
+  throw new Error('LLM service not configured');
+}
+
+/**
+ * Rule-based task decomposition (fallback)
+ */
+async function ruleBasedDecompose(taskId, taskDescription) {
+  const description = taskDescription.toLowerCase();
+  const subtasks = [];
+  const parallelGroups = [];
+  const dependencies = {};
+  
+  // Pattern matching for common task types
+  if (description.includes('job application') || description.includes('apply to')) {
+    subtasks.push(
+      { id: 'step-1', name: 'Find positions', description: 'Search for open roles', tool: 'web_search', input: 'job title, company, location', estimatedDuration: '5min' },
+      { id: 'step-2', name: 'Extract requirements', description: 'Parse job descriptions', tool: 'summarize-pro', input: 'job postings', estimatedDuration: '3min' },
+      { id: 'step-3', name: 'Match skills', description: 'Compare to your skills', tool: 'knowledge', input: 'resume, skills', estimatedDuration: '2min' },
+      { id: 'step-4', name: 'Tailor resume', description: 'Customize for each role', tool: 'file_edit', input: 'resume template', estimatedDuration: '5min' },
+      { id: 'step-5', name: 'Write cover letters', description: 'Generate personalized letters', tool: 'text_generation', input: 'job requirements', estimatedDuration: '5min' },
+      { id: 'step-6', name: 'Fill applications', description: 'Submit via web forms', tool: 'agent-browser', input: 'application URLs', estimatedDuration: '10min' },
+      { id: 'step-7', name: 'Track submissions', description: 'Log all applications', tool: 'file_write', input: 'application data', estimatedDuration: '2min' }
+    );
+    
+    // Dependencies
+    dependencies['step-2'] = ['step-1'];
+    dependencies['step-3'] = ['step-2'];
+    dependencies['step-4'] = ['step-3'];
+    dependencies['step-5'] = ['step-3'];
+    dependencies['step-6'] = ['step-4', 'step-5'];
+    dependencies['step-7'] = ['step-6'];
+    
+    // Parallel groups (tailoring resume and writing letters can happen in parallel)
+    parallelGroups.push(['step-4', 'step-5']);
+    
+  } else if (description.includes('blog') || description.includes('content') || description.includes('post')) {
+    subtasks.push(
+      { id: 'step-1', name: 'Research topics', description: 'Find relevant information', tool: 'web_search', input: 'topic keywords', estimatedDuration: '5min' },
+      { id: 'step-2', name: 'Create outline', description: 'Structure the post', tool: 'text_generation', input: 'research results', estimatedDuration: '3min' },
+      { id: 'step-3', name: 'Write content', description: 'Generate main content', tool: 'text_generation', input: 'outline', estimatedDuration: '15min' },
+      { id: 'step-4', name: 'Create code examples', description: 'Generate working code', tool: 'agent-browser', input: 'topic requirements', estimatedDuration: '10min' },
+      { id: 'step-5', name: 'Test examples', description: 'Verify code works', tool: 'exec', input: 'code snippets', estimatedDuration: '5min' },
+      { id: 'step-6', name: 'Format as Markdown', description: 'Prepare final post', tool: 'file_edit', input: 'content + code', estimatedDuration: '5min' },
+      { id: 'step-7', name: 'Publish', description: 'Upload to blog platform', tool: 'github', input: 'final content', estimatedDuration: '2min' }
+    );
+    
+    dependencies['step-2'] = ['step-1'];
+    dependencies['step-3'] = ['step-2'];
+    dependencies['step-4'] = ['step-3'];
+    dependencies['step-5'] = ['step-4'];
+    dependencies['step-6'] = ['step-3', 'step-5'];
+    dependencies['step-7'] = ['step-6'];
+    
+  } else {
+    // Generic decomposition for unknown tasks
+    const steps = ['Research', 'Planning', 'Execution', 'Review', 'Documentation'];
+    steps.forEach((step, idx) => {
+      subtasks.push({
+        id: `step-${idx+1}`,
+        name: step,
+        description: `Complete ${step.toLowerCase()} phase`,
+        tool: 'text_generation',
+        input: 'task context',
+        estimatedDuration: '10min'
+      });
+      
+      if (idx > 0) {
+        dependencies[`step-${idx+1}`] = [`step-${idx}`];
+      }
+    });
+  }
+  
+  return {
+    taskId,
+    description: taskDescription,
+    timestamp: new Date().toISOString(),
+    complexity: 'medium',
+    estimatedSteps: subtasks.length,
+    subtasks,
+    dependencies,
+    parallelGroups,
+    recommendedTools: [...new Set(subtasks.map(s => s.tool))]
+  };
+}
+
+/**
+ * Execute a single subtask with retry logic
+ */
+async function executeSubtask(subtask, taskId) {
+  console.log(`⚙️  Executing subtask: ${subtask.name}`);
+  console.log(`   Tool: ${subtask.tool}`);
+  console.log(`   Input: ${subtask.input}\n`);
+  
+  for (let attempt = 1; attempt <= CONFIG.maxRetries; attempt++) {
+    console.log(`  Attempt ${attempt}/${CONFIG.maxRetries}`);
+    
+    try {
+      // Execute the subtask using appropriate tool
+      const result = await dispatchToTool(subtask);
+      
+      // Save checkpoint
+      await saveCheckpoint(taskId, subtask.id, {
+        status: 'completed',
+        attempt: attempt,
+        result: result,
+        timestamp: new Date().toISOString(),
+        subtask: subtask.name
+      });
+      
+      console.log(`  ✅ Completed successfully\n`);
+      return { success: true, result, attempt };
+    } catch (error) {
+      console.error(`  ❌ Attempt ${attempt} failed: ${error.message}\n`);
+      
+      if (attempt === CONFIG.maxRetries) {
+        await saveCheckpoint(taskId, subtask.id, {
+          status: 'failed',
+          attempts: attempt,
+          error: error.message,
+          timestamp: new Date().toISOString(),
+          subtask: subtask.name
+        });
+        
+        return { success: false, error: error.message, attempts: attempt };
+      }
+      
+      // Wait before retry (exponential backoff)
+      const waitTime = Math.pow(2, attempt) * 1000;
+      console.log(`  ⏳ Waiting ${waitTime}ms before retry...\n`);
+      await sleep(waitTime);
+    }
+  }
+}
+
+/**
+ * Dispatch to appropriate tool based on subtask.tool
+ */
+async function dispatchToTool(subtask) {
+  console.log(`  🛠️  Dispatching to tool: ${subtask.tool}`);
+  
+  // Tool dispatch logic - in production, this calls the actual tools
+  switch (subtask.tool) {
+    case 'web_search':
+      return await execTool('web_search', subtask.input);
+    case 'agent-browser':
+      return await execTool('agent-browser', subtask.input);
+    case 'gog':
+      return await execTool('gog', subtask.input);
+    case 'github':
+      return await execTool('gh', subtask.input);
+    case 'file_edit':
+    case 'file_read':
+    case 'file_write':
+      return await execTool('file_ops', subtask.input);
+    case 'summarize-pro':
+      return await execTool('summarize-pro', subtask.input);
+    case 'text_generation':
+      return await execTool('text_generation', subtask.input);
+    case 'exec':
+      return await execTool('exec', subtask.input);
+    case 'knowledge':
+      return { result: 'Using internal knowledge', input: subtask.input };
+    default:
+      // Generic placeholder
+      return {
+        tool: subtask.tool,
+        input: subtask.input,
+        output: `Would execute: ${subtool.description || 'placeholder execution'}`,
+        simulated: true
+      };
+  }
+}
+
+/**
+ * Execute a tool (placeholder - would integrate with real tools)
+ */
+async function execTool(toolName, input) {
+  // This is a simplified execution engine
+  // In production, this would spawn/process the actual CLI/tools
+  
+  // For now, we demonstrate what WOULD happen:
+  const wouldExecute = `Command: ${toolName} "${input.substring(0, 50)}..."`;
+  console.log(`  📝 Would execute: ${wouldExecute}`);
+  
+  // Return placeholder success
+  return {
+    tool: toolName,
+    input: input,
+    status: 'simulated',
+    message: 'Tool execution placeholder'
+  };
 }
 
 /**
